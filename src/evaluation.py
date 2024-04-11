@@ -11,6 +11,7 @@ import random
 import tensorflow as tf
 import sklearn.metrics
 from scipy import integrate
+
 import utility_functions
 
 seed_list = [1, 2, 3]

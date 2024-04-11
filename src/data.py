@@ -7,11 +7,11 @@ Mercedesstr. 137 | 70327 Stuttgart | Germany
 import os
 import pickle
 import random
-from sklearn.model_selection import train_test_split
 import tensorflow as tf
 import numpy as np
+from sklearn.model_selection import train_test_split
+
 import utility_functions
-from tensorflow.keras.layers import *
 
 seed = 1
 np.random.seed(seed)

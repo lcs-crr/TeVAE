@@ -6,6 +6,7 @@ Mercedesstr. 137 | 70327 Stuttgart | Germany
 
 import os
 import tensorflow as tf
+
 from vsvae import *
 from omnianomaly import *
 from wvae import *
