@@ -1,43 +1,15 @@
-# Lucas Correia
-# PhD Candidate - Online Multivariate Time-series Anomaly Detection
-# RD/EPDT - Evaluation Systems & Calibration Methods
-# Mercedes-Benz AG | Factory 019
-# Mercedesstraße 137 | HPC D650 | 70546 Stuttgart | Germany
+"""
+Lucas Correia
+Mercedes-Benz AG
+Mercedesstr. 137 | 70327 Stuttgart | Germany
+"""
 
-import numpy as np
-from scipy.signal import butter, lfilter
-import tensorflow_probability as tfp
-import tensorflow as tf
-import scipy
-from statsmodels.tsa import stattools
 import os
 import pickle
-from scipy.interpolate import interp1d
-import sklearn
-
-
-def generator_whole(data):
-    """
-    This function generates a generator for whole sequences.
-
-    :param data: list of multivariate time series
-    :type data: list[array (time steps, channels)]
-    :return: whatever the output is
-    """
-    for i in range(len(data)):
-        yield data[i][:, :], data[i][:, :]
-
-
-def generator_window(data):
-    """
-    This function generates a generator for windows.
-
-    :param data: windows of multivariate time series
-    :type data: array (number of windows, window size, channels)
-    :return: whatever the output is
-    """
-    for i in range(len(data)):
-        yield data[i, :, :], data[i, :, :]
+import numpy as np
+import tensorflow as tf
+import tensorflow_probability as tfp
+from statsmodels.tsa import stattools
 
 
 def window_list(input_list, window_size, shift):
@@ -160,89 +132,6 @@ def scale_list(input_list, scalers, scale_type):
     return data_scaled
 
 
-def downsample(time_series, cutoff_frequency, sampling_frequency, filter_order):
-    """
-    This function applies a low-pass Butterworth filter to a multivariate time series.
-    :param time_series: multivariate time series
-    :type time_series: array (time steps, channels)
-    :param cutoff_frequency: cutoff frequency
-    :type cutoff_frequency: float
-    :param sampling_frequency: sampling frequency
-    :type sampling_frequency: float
-    :param filter_order: filter order
-    :type filter_order: int
-    :return: low-pass filtered multivariate time series
-    :rtype: array (time steps, channels)
-    """
-    # Calculate Butterworth filter coefficients
-    b, a = butter(filter_order, cutoff_frequency, fs=sampling_frequency, btype='low', analog=False)
-    # Apply filter to time series
-    filtered_time_series = lfilter(b, a, time_series)
-    # Return filtered time series
-    return filtered_time_series
-
-
-def upsample(time_series, freq_target):
-    # Upsample to target frequency
-    time_axis = np.round(time_series.timestamps - time_series.timestamps[0], 3)
-    signal = time_series.samples
-    f = interp1d(time_axis, signal)
-    time_new = np.arange(0, time_axis[-1], 1 / freq_target)
-    signal_new = f(time_new)
-    return signal_new
-
-
-def find_similarity(time_series1, time_series2, mode='pearson'):
-    """
-    This function calculates the similarity between two univariate time series.
-
-    :param time_series1: first univariate time series
-    :type time_series1: array (time steps)
-    :param time_series2: second univariate time series
-    :type time_series2: array (time steps)
-    :param mode: similarity mode
-    :type mode: str
-    :return:
-    """
-    # If mode is Pearson correlation
-    if mode == 'pearson':
-        similarity = scipy.stats.pearsonr(time_series1, time_series2)[0]
-    # If mode is Euclidean distance
-    elif mode == 'euclidean':
-        similarity = scipy.spatial.distance.euclidean(time_series1, time_series2)
-    # If mode is cosine similarity
-    elif mode == 'cosine_similarity':
-        similarity = scipy.spatial.distance.cosine(time_series1, time_series2)
-    # If mode is manhattan distance
-    elif mode == 'manhattan':
-        similarity = scipy.spatial.distance.cityblock(time_series1, time_series2)
-    # If mode is correlation
-    elif mode == 'correlation':
-        similarity = scipy.spatial.distance.correlation(time_series1, time_series2)
-    # If mode is squared euclidean distance
-    elif mode == 'sqeuclidean':
-        similarity = scipy.spatial.distance.sqeuclidean(time_series1.numpy(), time_series2.numpy())
-    # If mode is coefficient of determination
-    elif mode == 'r2':
-        similarity = sklearn.metrics.r2_score(time_series1, time_series2)
-    # If mode is mse
-    elif mode == 'mse':
-        similarity = sklearn.metrics.mean_squared_error(time_series1, time_series2)
-    # If mode is component
-    elif mode == 'component':
-        idx = np.argmax(time_series1)
-        similarity = time_series2[idx] / time_series1[idx]
-    # If mode is max
-    elif mode == 'max':
-        idx = np.argmax(time_series1)
-        similarity = time_series2[idx]
-    # If mode is not provided
-    else:
-        similarity = 0
-    # Return similarity
-    return similarity
-
-
 def negative_log_likelihood(mean, standard_deviation, sample):
     """
     Calculates the negative log likelihood for Gaussian distribution parameters given sample
@@ -257,12 +146,12 @@ def negative_log_likelihood(mean, standard_deviation, sample):
     """
     multi_outputDist = tfp.distributions.MultivariateNormalDiag(loc=mean, scale_diag=standard_deviation)
     uni_outputDist = tfp.distributions.Normal(loc=mean, scale=standard_deviation)
-    multi_negloglik = tf.expand_dims(-multi_outputDist.log_prob(sample), axis=1)  # (M, 1)
-    uni_negloglik = -uni_outputDist.log_prob(sample)  # (M, features)
+    multi_negloglik = tf.expand_dims(-multi_outputDist.log_prob(sample), axis=1)  # -> array(M, 1)
+    uni_negloglik = -uni_outputDist.log_prob(sample)  # -> array(M, features)
     return multi_negloglik, uni_negloglik
 
 
-def inference_s_vae(model, input_array, rev_mode, window_size, batch_size=512):
+def inference_vae(model, input_array, rev_mode, window_size, batch_size=512):
     """
     Inference function for stochastic variational autoencoder.
 
@@ -326,7 +215,7 @@ def inference_s_vae(model, input_array, rev_mode, window_size, batch_size=512):
     return multi_negloglik, uni_negloglik, [Xhat_mean, Xhat_std, Xhat], [Z_mean, Z_std, Z]
 
 
-def inference_det_vae(model, input_array, rev_mode, window_size, batch_size=512):
+def inference_vasp(model, input_array, rev_mode, window_size, batch_size=512):
     """
     Inference function for stochastic variational autoencoder.
 
@@ -375,11 +264,64 @@ def inference_det_vae(model, input_array, rev_mode, window_size, batch_size=512)
     # Calculate standard deviation parameter
     Z_std = np.sqrt(Z_var)
     # Calculate multivariate and univariate negative log likelihood
-    # score = tf.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)(input_array, Xhat).numpy()[:, np.newaxis]
-
     score = (input_array - Xhat) ** 2
     score = tf.reduce_sum(score, axis=-1)[:, np.newaxis]
+    # Clear GPU memory before next call
+    tf.keras.backend.clear_session()
+    # Return multivariate and univariate negative log likelihood and model outputs
+    return score, np.repeat(score, Xhat.shape[-1], axis=-1), [Xhat, Xhat, Xhat], [Z_mean, Z_std, Z]
 
+
+def inference_lwvae(model, input_array, rev_mode, window_size, batch_size=512):
+    """
+    Inference function for stochastic variational autoencoder.
+
+    :param model: trained model
+    :type model: tf.keras.Model
+    :param input_array: multivariate time series
+    :type input_array: array (time steps, channels)
+    :param rev_mode: reverse window mode
+    :type rev_mode: str
+    :param window_size: window size
+    :type window_size: int
+    :param batch_size: batch size
+    :type batch_size: int
+    :return: multivariate and univariate negative log likelihood and model outputs
+    :rtype: array (M, 1), array (M, features), list[list[array (M, features), array (M, features), array (M, features)], list[array (windows, window size, features), array (windows, window size, features), array (windows, window size, features)]]
+    """
+    # Window input array
+    input_windows = window_list(input_array, window_size, 1)
+    # Predict output windows
+    output_windows = model.predict(input_windows,
+                                   batch_size=batch_size,
+                                   verbose=0,
+                                   steps=None,
+                                   callbacks=None)
+
+    # Assign outputs
+    Xhat = output_windows[0]
+    Z_mean = output_windows[1]
+    Z_logvar = output_windows[2]
+    Z = output_windows[3]
+    # Calculate variance parameter
+    Z_var = np.exp(Z_logvar)
+    # If window size is provided
+    if window_size:
+        # Reverse window reconstruction
+        Xhat = reverse_window(Xhat, 1, rev_mode)
+        try:
+            # Reverse window mean parameter
+            Z_mean = reverse_window(Z_mean, 1, rev_mode)
+            # Reverse window variance parameter
+            Z_var = reverse_window(Z_var, 1, rev_mode)
+            # Reverse window reconstruction
+            Z = reverse_window(Z, 1, rev_mode)
+        except:
+            pass
+    # Calculate standard deviation parameter
+    Z_std = np.sqrt(Z_var)
+    # Calculate multivariate and univariate negative log likelihood
+    score = tf.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)(input_array, Xhat).numpy()[:, np.newaxis]
     # Clear GPU memory before next call
     tf.keras.backend.clear_session()
     # Return multivariate and univariate negative log likelihood and model outputs
@@ -407,49 +349,6 @@ def find_window_size(series):
         except:
             pass
     return np.max(intersection_list)
-
-
-def find_detection_delay_old(score, threshold, sampling_frequency, rev_mode, window_size, sequence_length, anomaly_start):
-    """
-    This function calculates the total detection delay for a given reverse window mode.
-
-    :param score: anomaly score
-    :type score: array (M, 1)
-    :param threshold: anomaly threshold
-    :type threshold: float
-    :param sampling_frequency: sampling frequency
-    :type sampling_frequency: float
-    :param rev_mode: reverse window mode
-    :type rev_mode: str
-    :param window_size: window size
-    :type window_size: int
-    :param sequence_length: sequence length
-    :type sequence_length: int
-    :param anomaly_start: anomaly start normalised by sequence_length
-    :type anomaly_start: float
-    :return: delay
-    :rtype: float
-    """
-    # Find first time step above threshold
-    time_step_detection = np.argwhere(score >= threshold)[0, 0]
-    # If reverse window mode is mean or first
-    if rev_mode == 'mean' or rev_mode == 'first':
-        # If detection time step is before sequence_length - window_size
-        if time_step_detection < sequence_length - window_size:
-            rev_window_penalty = window_size
-        # If detection time step is within last window_size time steps
-        else:
-            rev_window_penalty = sequence_length - time_step_detection
-    elif rev_mode == 'last':
-        # If detection time step is within first window_size time steps
-        if time_step_detection < window_size:
-            rev_window_penalty = window_size - time_step_detection
-        # If detection time step is after first window_size time steps
-        else:
-            rev_window_penalty = 0
-    # Sum detection delay with reverse window delay penalty and subtract in case of SS anomaly, then convert to seconds
-    delay = (time_step_detection + rev_window_penalty - len(score) * anomaly_start) / sampling_frequency
-    return delay, time_step_detection + rev_window_penalty
 
 
 def find_detection_delay(score, threshold, sampling_frequency, rev_mode, window_size, sequence_length, anomaly_start):

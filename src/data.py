@@ -23,7 +23,7 @@ data_load_path = 'Path to data'
 data_save_path = 'Path to data'
 
 # Load raw data
-# -> normal_list: list of normal sequences
+# -> normal_list: list of normal sequences (numpy arrays)
 # -> anomalous_list: list of anomalous sequences, each numpy array within has metadata indicating its type of anomaly
 normal_list = utility_functions.load_pickle(os.path.join(data_load_path, 'normal.pkl'))
 anomalous_list = utility_functions.load_pickle(os.path.join(data_load_path, 'anomalous.pkl'))
