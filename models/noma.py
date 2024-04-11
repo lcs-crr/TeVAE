@@ -11,13 +11,12 @@ from tensorflow.keras import layers as tfkl
 
 
 class NoMA(tf.keras.Model):
-    def __init__(self, encoder, decoder, ma, beta=1e-8):
+    def __init__(self, encoder, decoder, beta=1e-8):
         super(NoMA, self).__init__()
 
         # Model
         self.encoder = encoder
         self.decoder = decoder
-        self.ma = ma
 
         # Metrics
         self.total_loss_tracker = tf.keras.metrics.Mean(name="loss")
@@ -125,14 +124,14 @@ class NoMA_Encoder(tf.keras.Model):
         self.encoder = self.build_BiLSTM_encoder()
 
     def build_BiLSTM_encoder(self):
-        enc_input = Input(shape=(self.seq_len, self.features))
-        enc_input = GaussianNoise(0.01)(enc_input)
-        bilstm = Bidirectional(LSTM(512, return_sequences=True))(enc_input)
-        bilstm = Bidirectional(LSTM(256, return_sequences=True))(bilstm)
-        Z_mean = TimeDistributed(Dense(self.latent_dim, name="Z_mean"))(bilstm)
-        Z_logvar = TimeDistributed(Dense(self.latent_dim, name="Z_logvar"))(bilstm)
+        enc_input = tfkl.Input(shape=(self.seq_len, self.features))
+        enc_input = tfkl.GaussianNoise(0.01)(enc_input)
+        bilstm = tfkl.Bidirectional(tfkl.LSTM(512, return_sequences=True))(enc_input)
+        bilstm = tfkl.Bidirectional(tfkl.LSTM(256, return_sequences=True))(bilstm)
+        Z_mean = tfkl.TimeDistributed(tfkl.Dense(self.latent_dim, name="Z_mean"))(bilstm)
+        Z_logvar = tfkl.TimeDistributed(tfkl.Dense(self.latent_dim, name="Z_logvar"))(bilstm)
         output_dist = tfp.distributions.Normal(loc=0., scale=1.)
-        eps = output_dist.sample(tf.shape(Z_mean), seed=seed)
+        eps = output_dist.sample(tf.shape(Z_mean), seed=self.seed)
         Z = Z_mean + tf.sqrt(tf.math.exp(Z_logvar)) * eps
         return tf.keras.Model(enc_input, [Z_mean, Z_logvar, Z, bilstm], name="encoder")
 
@@ -142,7 +141,7 @@ class NoMA_Encoder(tf.keras.Model):
 
 
 class NoMA_Decoder(tf.keras.Model):
-    def __init__(self, seq_len, latent_dim, features):
+    def __init__(self, seq_len, latent_dim, features, seed):
         super(NoMA_Decoder, self).__init__()
         self.seq_len = seq_len
         self.latent_dim = latent_dim
@@ -151,15 +150,15 @@ class NoMA_Decoder(tf.keras.Model):
         self.decoder = self.build_BiLSTM_decoder()
 
     def build_BiLSTM_decoder(self):
-        attention_input = Input(shape=(self.seq_len, self.latent_dim))
-        bilstm = Bidirectional(LSTM(256, return_sequences=True))(attention_input)
-        bilstm = Bidirectional(LSTM(512, return_sequences=True))(bilstm)
-        Xhat_mean = TimeDistributed(Dense(self.features), name="Xhat_mean")(bilstm)
-        Xhat_logvar = TimeDistributed(Dense(self.features), name="Xhat_logvar")(bilstm)
+        dec_input = tfkl.Input(shape=(self.seq_len, self.latent_dim))
+        bilstm = tfkl.Bidirectional(tfkl.LSTM(256, return_sequences=True))(dec_input)
+        bilstm = tfkl.Bidirectional(tfkl.LSTM(512, return_sequences=True))(bilstm)
+        Xhat_mean = tfkl.TimeDistributed(tfkl.Dense(self.features), name="Xhat_mean")(bilstm)
+        Xhat_logvar = tfkl.TimeDistributed(tfkl.Dense(self.features), name="Xhat_logvar")(bilstm)
         output_dist = tfp.distributions.Normal(loc=0., scale=1.)
-        eps = output_dist.sample(tf.shape(Xhat_mean), seed=seed)
+        eps = output_dist.sample(tf.shape(Xhat_mean), seed=self.seed)
         Xhat = Xhat_mean + tf.sqrt(tf.math.exp(Xhat_logvar)) * eps
-        return tf.keras.Model(attention_input, [Xhat_mean, Xhat_logvar, Xhat], name="decoder")
+        return tf.keras.Model(dec_input, [Xhat_mean, Xhat_logvar, Xhat], name="decoder")
 
     @tf.function
     def call(self, inputs, **kwargs):

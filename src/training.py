@@ -7,19 +7,19 @@ Mercedesstr. 137 | 70327 Stuttgart | Germany
 import os
 import tensorflow as tf
 
-from vsvae import *
-from omnianomaly import *
-from wvae import *
-from sisvae import *
-from vasp import *
-from lwvae import *
-from noma import *
-from tevae import *
-from kl_annealing import *
+from models.vsvae import *
+from models.omnianomaly import *
+from models.wvae import *
+from models.sisvae import *
+from models.vasp import *
+from models.lwvae import *
+from models.noma import *
+from models.tevae import *
+from utils.kl_annealing import *
 
 seed_list = [1, 2, 3]
 data_split_list = ['1h', '8h', '64h', '512h']
-max_epochs = 10000
+max_epochs = 1
 
 for seed in seed_list:
     tf.random.set_seed(seed)
@@ -56,7 +56,7 @@ for seed in seed_list:
 
         annealing = KL_annealing(
             annealing_epochs=25,
-            type="monotonic",
+            annealing_type="monotonic",
             grace_period=25,
             start=1e-8,
             end=1e-2,
@@ -69,6 +69,7 @@ for seed in seed_list:
                   validation_data=tfdata_val,
                   verbose=2
                   )
+        vsvae.predict(tf.random.normal((1, window_size, features)), verbose=0)
         vsvae.save(os.path.join(model_save_path, 'vsvae' + '_' + data_split + '_' + str(seed)))
         # endregion
 
@@ -85,6 +86,7 @@ for seed in seed_list:
                         validation_data=tfdata_val,
                         verbose=2
                         )
+        omnianomaly.predict(tf.random.normal((1, window_size, features)), verbose=0)
         omnianomaly.save(os.path.join(model_save_path, 'omnianomaly' + '_' + data_split + '_' + str(seed)))
         # endregion
 
@@ -96,7 +98,7 @@ for seed in seed_list:
 
         annealing = KL_annealing(
             annealing_epochs=25,
-            type="monotonic",
+            annealing_type="monotonic",
             grace_period=25,
             start=1e-8,
             end=1e-2,
@@ -109,6 +111,7 @@ for seed in seed_list:
                  validation_data=tfdata_val,
                  verbose=2
                  )
+        wvae.predict(tf.random.normal((1, window_size, features)), verbose=0)
         wvae.save(os.path.join(model_save_path, 'wvae' + '_' + data_split + '_' + str(seed)))
         # endregion
 
@@ -125,6 +128,7 @@ for seed in seed_list:
                    validation_data=tfdata_val,
                    verbose=2
                    )
+        sisvae.predict(tf.random.normal((1, window_size, features)), verbose=0)
         sisvae.save(os.path.join(model_save_path, 'sisvae' + '_' + data_split + '_' + str(seed)))
         # endregion
 
@@ -141,6 +145,7 @@ for seed in seed_list:
                  validation_data=tfdata_val,
                  verbose=2
                  )
+        vasp.predict(tf.random.normal((1, window_size, features)), verbose=0)
         vasp.save(os.path.join(model_save_path, 'vasp' + '_' + data_split + '_' + str(seed)))
         # endregion
 
@@ -157,22 +162,22 @@ for seed in seed_list:
                   validation_data=tfdata_val,
                   verbose=2
                   )
+        lwvae.predict(tf.random.normal((1, window_size, features)), verbose=0)
         lwvae.save(os.path.join(model_save_path, 'lwvae' + '_' + data_split + '_' + str(seed)))
         # endregion
 
         # region NoMA
-        encoder = NoMA_Encoder(seq_len=window_size, latent_dim=3, features=features, attn_vector_size=3, seed=seed)
-        decoder = NoMA_Decoder(seq_len=window_size, latent_dim=3, features=features, attn_vector_size=3, seed=seed)
-        noma = NoMA(encoder, decoder, beta=1e-8, att_beta=1e-2)
+        encoder = NoMA_Encoder(seq_len=window_size, latent_dim=64, features=features, seed=seed)
+        decoder = NoMA_Decoder(seq_len=window_size, latent_dim=64, features=features, seed=seed)
+        noma = NoMA(encoder, decoder, beta=1e-8)
         noma.compile(optimizer=tf.keras.optimizers.Adam(amsgrad=True))
 
         annealing = KL_annealing(
             annealing_epochs=25,
-            type="cyclical",
+            annealing_type="cyclical",
             grace_period=25,
             start=1e-8,
             end=1e-2,
-            lower_initial_betas=False,
         )
 
         # Fit model
@@ -182,23 +187,33 @@ for seed in seed_list:
                  validation_data=tfdata_val,
                  verbose=2
                  )
+        noma.predict(tf.random.normal((1, window_size, features)), verbose=0)
         noma.save(os.path.join(model_save_path, 'noma' + '_' + data_split + '_' + str(seed)))
         # endregion
 
         # region TeVAE
-        encoder = TeVAE_Encoder(seq_len=seq_len, latent_dim=latent_dim, features=features, seed=seed)
-        decoder = TeVAE_Decoder(seq_len=seq_len, latent_dim=latent_dim, features=features, seed=seed)
-        ma = MA(seq_len=seq_len, latent_dim=latent_dim, features=features)
+        encoder = TeVAE_Encoder(seq_len=window_size, latent_dim=64, features=features, seed=seed)
+        decoder = TeVAE_Decoder(seq_len=window_size, latent_dim=64, features=features, seed=seed)
+        ma = MA(seq_len=window_size, latent_dim=64, features=features, key_dim=1)
         tevae = TeVAE(encoder, decoder, ma, beta=1e-8)
         tevae.compile(optimizer=tf.keras.optimizers.Adam(amsgrad=True))
 
-        # Fit vae model
+        annealing = KL_annealing(
+            annealing_epochs=25,
+            annealing_type="cyclical",
+            grace_period=25,
+            start=1e-8,
+            end=1e-2,
+        )
+
+        # Fit model
         tevae.fit(tfdata_train,
                   epochs=max_epochs,
                   callbacks=[annealing, es],
                   validation_data=tfdata_val,
                   verbose=2
                   )
+        tevae.predict(tf.random.normal((1, window_size, features)), verbose=0)
         tevae.save(os.path.join(model_save_path, 'tevae' + '_' + data_split + '_' + str(seed)))
         # endregion
 

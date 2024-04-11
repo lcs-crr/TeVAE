@@ -7,11 +7,12 @@ Mercedesstr. 137 | 70327 Stuttgart | Germany
 import os
 import pickle
 import random
+import math
 import tensorflow as tf
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-import utility_functions
+import utils.utility_functions as utility_functions
 
 seed = 1
 np.random.seed(seed)
@@ -31,7 +32,7 @@ anomalous_list = utility_functions.load_pickle(os.path.join(data_load_path, 'ano
 # Iterate through normal_list and find the time in hours each sequence represents
 meas_time = []
 for normal_ts in normal_list:
-    meas_time.append(len(sequence) / (2*60*60))  # 2*60*60 converts samples to hours
+    meas_time.append(len(normal_ts) / (2*60*60))  # 2*60*60 converts samples to hours
 
 # Find total dynamic testing time
 cumsum = np.cumsum(meas_time)
@@ -57,9 +58,9 @@ random.shuffle(test_list)
 data_split_list = ['1h', '8h', '64h', '512h']
 
 # Find the most suitable window size (power of two) and the corresponding window shift
-window_size = max([ts_processor.find_window_size(series) for series in train_list_resampled])
-window_size_corrected = 2 ** (math.ceil(math.log(window_size, 2)))
-window_shift = window_size_corrected // 2
+window_size = max([utility_functions.find_window_size(series) for series in normal_list])
+window_size = 2 ** (math.ceil(math.log(window_size, 2)))
+window_shift = window_size // 2
 
 for data_splits_idx, train_list in enumerate(train_list_list):
     train_list, val_list = train_test_split(train_list, random_state=seed, test_size=0.2)
