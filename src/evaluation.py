@@ -12,7 +12,7 @@ import tensorflow as tf
 import sklearn.metrics
 from scipy import integrate
 
-import utility_functions
+import utils.utility_functions as utility_functions
 
 seed_list = [1, 2, 3]
 data_split_list = ['1h', '8h', '64h', '512h']
@@ -48,8 +48,8 @@ for model_seed in seed_list:
                         'Inverter Temperature [-]',
                         ]
 
-        val_list = utility_functions.load_pickle(os.path.join(data_load_path, 'val.pkl'))
-        test_list = utility_functions.load_pickle(os.path.join(data_load_path, 'test.pkl'))
+        val_list = utility_functions.load_pickle(os.path.join(data_load_path, data_split, 'val.pkl'))
+        test_list = utility_functions.load_pickle(os.path.join(data_load_path, data_split, 'test.pkl'))
 
         model_config = model_name + '_' + data_split + '_' + str(model_seed)
 
@@ -61,19 +61,15 @@ for model_seed in seed_list:
         val_latent = []
         for val_ts in val_list:
             if model_name == 'vasp':
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vasp(model, time_series, rev_mode, window_size)
+                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vasp(model, val_ts, reverse_window_mode, window_size)
             elif model_name == 'lwvae':
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_lwvae(model, time_series, rev_mode, window_size)
+                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_lwvae(model, val_ts, reverse_window_mode, window_size)
             else:
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vae(model, time_series, rev_mode, window_size)
+                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vae(model, val_ts, reverse_window_mode, window_size)
             val_anomaly_score.append(anomaly_score)
             val_rootcause_score.append(rootcause_score)
             val_recon.append(recon)
             val_latent.append(latent)
-        utility_functions.dump_pickle(os.path.join(model_load_path, model_config, 'val_anomaly_score_' + rev_mode + '.pkl'), val_anomaly_score)
-        utility_functions.dump_pickle(os.path.join(model_load_path, model_config, 'val_rootcause_score_' + rev_mode + '.pkl'), val_rootcause_score)
-        utility_functions.dump_pickle(os.path.join(model_load_path, model_config, 'val_recon_' + rev_mode + '.pkl'), val_recon)
-        utility_functions.dump_pickle(os.path.join(model_load_path, model_config, 'val_latent_' + rev_mode + '.pkl'), val_latent)
 
         # Inference on test data
         test_anomaly_score = []
@@ -82,23 +78,19 @@ for model_seed in seed_list:
         test_latent = []
         for test_ts in test_list:
             if model_name == 'vasp':
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vasp(model, time_series, rev_mode, window_size)
+                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vasp(model, test_ts, reverse_window_mode, window_size)
             elif model_name == 'lwvae':
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_lwvae(model, time_series, rev_mode, window_size)
+                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_lwvae(model, test_ts, reverse_window_mode, window_size)
             else:
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vae(model, time_series, rev_mode, window_size)
+                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vae(model, test_ts, reverse_window_mode, window_size)
             test_anomaly_score.append(anomaly_score)
             test_rootcause_score.append(rootcause_score)
             test_recon.append(recon)
             test_latent.append(latent)
-        utility_functions.dump_pickle(os.path.join(model_load_path, model_config, 'test_anomaly_score_' + rev_mode + '.pkl'), test_anomaly_score)
-        utility_functions.dump_pickle(os.path.join(model_load_path, model_config, 'test_rootcause_score_' + rev_mode + '.pkl'), test_rootcause_score)
-        utility_functions.dump_pickle(os.path.join(model_load_path, model_config, 'test_recon_' + rev_mode + '.pkl'), test_recon)
-        utility_functions.dump_pickle(os.path.join(model_load_path, model_config, 'test_latent_' + rev_mode + '.pkl'), test_latent)
 
         # Evaluate validation data to obtain threshold
         max_val_list_error = [np.max(score_ts) for score_ts in val_anomaly_score]
-        threshold = np.percentile(red_val_data_error, 100)
+        threshold = np.percentile(max_val_list_error, 100)
 
         motor_pump_middle_groundtruth_rootcause_channels = [10, 11, 12]
         motor_pump_beginning_groundtruth_rootcause_channels = [10, 11, 12]
