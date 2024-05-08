@@ -145,15 +145,15 @@ for model_seed in seed_list:
                     # False positive
                     else:
                         FP += 1
-                        delay = len(score_ts) / sampling_rate
-                        total_delays.append(delay)
+                        delay, _ = ts_processor.find_detection_delay(score_ts, threshold, sampling_rate, reverse_window_mode, window_size, len(score_ts), groundtruth_anomaly_start)
+                        total_delays.append(abs(delay))
                         test_rootcause_channels.append(np.nan)
                         test_rootcause_labels.append(label)
                 # =0 time steps in anomaly score higher than threshold
                 # False negative
                 else:
                     FN += 1
-                    delay = len(score_ts) / sampling_rate
+                    delay = (len(score_ts) - groundtruth_anomaly_start) / sampling_rate
                     total_delays.append(delay)
             # Append to list with all test anomaly scores
             total_test_anomaly_score.append(score_ts)
@@ -324,15 +324,15 @@ for model_seed in seed_list:
                     # False positive
                     else:
                         FP += 1
-                        delay = len(score_ts) / sampling_rate
-                        total_delays.append(delay)
+                        delay, _ = ts_processor.find_detection_delay(score_ts, threshold, sampling_rate, reverse_window_mode, window_size, len(score_ts), groundtruth_anomaly_start)
+                        total_delays.append(abs(delay))
                         test_rootcause_channels.append(np.nan)
                         test_rootcause_labels.append(label)
                 # =0 time steps in anomaly score higher than threshold
                 # False negative
                 else:
                     FN += 1
-                    delay = len(score_ts) / sampling_rate
+                    delay = (len(score_ts) - groundtruth_anomaly_start) / sampling_rate
                     total_delays.append(delay)
             # Append to list with all test anomaly scores
             total_test_anomaly_score.append(score_ts)
