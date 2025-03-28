@@ -20,7 +20,7 @@ data_path = config['data_path']
 model_path = config['model_path']
 
 # Declare constants
-MODEL_NAME = 'tevae'  # or 'omnianomaly', 'sisvae', 'lwvae', 'vsvae', 'vasp', 'wvae', 'noma
+MODEL_NAME = 'tevae'  # or 'omnianomaly', 'sisvae', 'lwvae', 'vsvae', 'vasp', 'wvae', 'noma'
 
 data_split_list = ['1h', '8h', '64h', '512h']
 
@@ -32,7 +32,7 @@ for seed in range(1, 4):
     for data_split in data_split_list:
         # Declare model name and paths
         data_load_path = os.path.join(data_path, '2_preprocessed')
-        model_save_path = os.path.join(model_path, MODEL_NAME + '_' + AD_MODE + '_' + str(fold_idx) + '_' + str(seed))
+        model_save_path = os.path.join(model_path, MODEL_NAME + '_' + data_split + '_' + str(seed))
 
         # Load data
         tfdata_train = tf.data.Dataset.load(os.path.join(data_load_path, data_split, 'train'))
@@ -42,7 +42,7 @@ for seed in range(1, 4):
         tfdata_val = tfdata_val.cache().batch(512).prefetch(tf.data.AUTOTUNE)
 
         # Establish callbacks
-        es = tf.keras.callbacks.EarlyStopping(
+        early_stopping = tf.keras.callbacks.EarlyStopping(
             monitor='val_rec_loss',
             mode='min',
             verbose=1,
@@ -104,8 +104,8 @@ for seed in range(1, 4):
             from model_garden.vsvae import *
             annealing = KLAnnealing(
                 annealing_type="monotonic",
-                start=1e-8,
-                end=1e-2,
+                beta_start=1e-8,
+                beta_end=1e-2
             )
             latent_dim = 3
             hidden_units = 128
@@ -130,8 +130,8 @@ for seed in range(1, 4):
             from model_garden.wvae import *
             annealing = KLAnnealing(
                 annealing_type="monotonic",
-                start=1e-8,
-                end=1e-2,
+                beta_start=1e-8,
+                beta_end=1e-2
             )
             latent_dim = 5
             hidden_units = 128
@@ -168,7 +168,6 @@ for seed in range(1, 4):
         model.predict(tf.random.normal((32, window_size, features)), verbose=0)
 
         # Save model and losses
-        os.makedirs(model_save_path, exist_ok=True)
-        model.save(os.path.join(model_save_path, MODEL_NAME + '_' + data_split + '_' + str(seed)))
+        model.save(model_save_path)
         data_class.DataProcessor().dump_pickle(history, os.path.join(model_save_path, 'losses.pkl'))
         tf.keras.backend.clear_session()

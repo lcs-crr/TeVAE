@@ -13,7 +13,6 @@ tfkl = tf.keras.layers
 tfd = tfp.distributions
 
 
-@tf.keras.saving.register_keras_serializable(package="VSVAE")
 class KLAnnealing(tf.keras.callbacks.Callback):
     def __init__(
             self,
@@ -65,7 +64,6 @@ class KLAnnealing(tf.keras.callbacks.Callback):
         return cls(**config)
 
 
-@tf.keras.saving.register_keras_serializable(package="VSVAE")
 class VSVAE(tf.keras.Model):
     def __init__(
             self,
@@ -212,7 +210,6 @@ class VSVAE(tf.keras.Model):
         return cls(encoder=encoder, decoder=decoder, vs=vs, beta=config["beta"], att_beta=config["att_beta"])
 
 
-@tf.keras.saving.register_keras_serializable(package="VSVAE")
 class VSVAE_Encoder(tf.keras.Model):
     def __init__(
             self,
@@ -271,7 +268,6 @@ class VSVAE_Encoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="VSVAE")
 class VSVAE_Decoder(tf.keras.Model):
     def __init__(
             self,
@@ -333,7 +329,6 @@ class VSVAE_Decoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="VSVAE")
 class VS(tf.keras.Model):
     def __init__(
             self,

@@ -8,8 +8,9 @@ import os
 from typing import Optional, List, Tuple
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tqdm import tqdm
-from model_garden import tevae, tcnae, sisvae, omnianomaly, lwvae, vsvae, vasp
+from model_garden import tevae, sisvae, omnianomaly, lwvae, vsvae, vasp, wvae, noma
 from utilities import base_class
 
 
@@ -154,7 +155,7 @@ class Inferencer(base_class.BaseProcessor):
 
         assert self.model_path is not None, 'model_path must be provided!'
 
-        return self.model_path.split('/')[-1][:-7]
+        return self.model_path.split('/')[-1][:-5]
 
     def _load_keras_model(
             self,
@@ -170,48 +171,54 @@ class Inferencer(base_class.BaseProcessor):
         assert self.model_path is not None, 'model_path must be provided!'
 
         if model_name == 'tevae':
-            model = tf.keras.models.load_model(os.path.join(self.model_path, 'model.keras'), custom_objects={
+            model = tf.keras.models.load_model(self.model_path, custom_objects={
                 'TEVAE_Encoder': tevae.TEVAE_Encoder,
                 'TEVAE_Decoder': tevae.TEVAE_Decoder,
                 'MA': tevae.MA,
                 'TEVAE': tevae.TEVAE,
             })
-        elif model_name == 'tcnae':
-            model = tf.keras.models.load_model(os.path.join(self.model_path, 'model.keras'), custom_objects={
-                'TCNAE_Encoder': tcnae.TCNAE_Encoder,
-                'TCNAE_Decoder': tcnae.TCNAE_Decoder,
-                'TCN': tcnae.TCNAE,
-            })
         elif model_name == 'sisvae':
-            model = tf.keras.models.load_model(os.path.join(self.model_path, 'model.keras'), custom_objects={
+            model = tf.keras.models.load_model(self.model_path, custom_objects={
                 'SISVAE_Encoder': sisvae.SISVAE_Encoder,
                 'SISVAE_Decoder': sisvae.SISVAE_Decoder,
                 'SISVAE': sisvae.SISVAE,
             })
         elif model_name == 'omnianomaly':
-            model = tf.keras.models.load_model(os.path.join(self.model_path, 'model.keras'), custom_objects={
+            model = tf.keras.models.load_model(self.model_path, custom_objects={
                 'OmniAnomaly': omnianomaly.OmniAnomaly,
                 'OmniAnomaly_Encoder': omnianomaly.OmniAnomaly_Encoder,
                 'OmniAnomaly_Decoder': omnianomaly.OmniAnomaly_Decoder,
             })
         elif model_name == 'lwvae':
-            model = tf.keras.models.load_model(os.path.join(self.model_path, 'model.keras'), custom_objects={
+            model = tf.keras.models.load_model(self.model_path, custom_objects={
                 'LWVAE': lwvae.LWVAE,
                 'LWVAE_Encoder': lwvae.LWVAE_Encoder,
                 'LWVAE_Decoder': lwvae.LWVAE_Decoder,
             })
         elif model_name == 'vsvae':
-            model = tf.keras.models.load_model(os.path.join(self.model_path, 'model.keras'), custom_objects={
+            model = tf.keras.models.load_model(self.model_path, custom_objects={
                 'VSVAE': vsvae.VSVAE,
                 'VSVAE_Encoder': vsvae.VSVAE_Encoder,
                 'VSVAE_Decoder': vsvae.VSVAE_Decoder,
                 'VS': vsvae.VS,
             })
         elif model_name == 'vasp':
-            model = tf.keras.models.load_model(os.path.join(self.model_path, 'model.keras'), custom_objects={
+            model = tf.keras.models.load_model(self.model_path, custom_objects={
                 'VASP': vasp.VASP,
                 'VASP_Encoder': vasp.VASP_Encoder,
                 'VASP_Decoder': vasp.VASP_Decoder,
+            })
+        elif model_name == 'wvae':
+            model = tf.keras.models.load_model(self.model_path, custom_objects={
+                'WVAE': wvae.WVAE,
+                'WVAE_Encoder': wvae.WVAE_Encoder,
+                'WVAE_Decoder': wvae.WVAE_Decoder,
+            })
+        elif model_name == 'noma':
+            model = tf.keras.models.load_model(self.model_path, custom_objects={
+                'NOMA': noma.NOMA,
+                'NOMA_Encoder': noma.NOMA_Encoder,
+                'NOMA_Decoder': noma.NOMA_Decoder,
             })
         else:
             raise ValueError('Model name not found!')
@@ -222,7 +229,7 @@ class Inferencer(base_class.BaseProcessor):
             input_list: List[np.ndarray],
             subset_name: str,
             save_inference_results: Optional[bool] = True,
-    ) -> Tuple[List[np.ndarray], List[List[np.ndarray]]]:
+    ) -> Tuple[List[np.ndarray], List[np.ndarray], List[List[np.ndarray]]]:
         """
         Inference function.
 
@@ -240,33 +247,37 @@ class Inferencer(base_class.BaseProcessor):
 
         _inference_array = {
             'tevae': self._tevae_inference,
-            'tcnae': self._tcnae_inference,
             'sisvae': self._sisvae_inference,
             'omnianomaly': self._omnianomaly_inference,
             'lwvae': self._lwvae_inference,
             'vsvae': self._vsvae_inference,
             'vasp': self._vasp_inference,
+            'wvae': self._wvae_inference,
+            'noma': self._noma_inference,
         }
 
         model_name = self._get_model_name_from_path()
         model = self._load_keras_model(model_name)
 
         detection_score_list = []
+        rootcause_score_list = []
         output_list = []
         for data_ts in tqdm(input_list):
-            detection_score, output = _inference_array[model_name](model, data_ts)
+            detection_score, rootcause_score, output = _inference_array[model_name](model, data_ts)
             detection_score_list.append(detection_score)
+            rootcause_score_list.append(rootcause_score)
             output_list.append(output)
         if save_inference_results:
             self.dump_pickle(detection_score_list, os.path.join(self.model_path, subset_name + '_detection_score' + '.pkl'))
+            self.dump_pickle(rootcause_score_list, os.path.join(self.model_path, subset_name + '_rootcause_score' + '.pkl'))
             self.dump_pickle(output_list, os.path.join(self.model_path, subset_name + '_output' + '.pkl'))
-        return detection_score_list, output_list
+        return detection_score_list, rootcause_score_list, output_list
 
     def _tevae_inference(
             self,
             model: tf.keras.Model,
             input_array: np.ndarray,
-    ) -> Tuple[np.ndarray, List[np.ndarray]]:
+    ) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
         """
         Private inference function for TeVAE.
 
@@ -293,49 +304,20 @@ class Inferencer(base_class.BaseProcessor):
         xhat = self._reverse_window_array(xhat)
         # Calculate standard deviation parameter
         xhat_std = np.sqrt(xhat_var)
-        # Calculate negative log likelihood
+        # Calculate anomaly score
         anomaly_score = model.rec_fn(input_array, [xhat_mean, np.log(xhat_var)], reduce_time=False).numpy()
+        # Calculate rootcause scores
+        rootcause_score = -tfp.distributions.Normal(loc=xhat_mean, scale=xhat_std).log_prob(input_array)
         # Clear GPU memory before next call
         tf.keras.backend.clear_session()
         # Return anomaly score and model outputs
-        return anomaly_score, [xhat_mean, xhat_std, xhat]
-
-    def _tcnae_inference(
-            self,
-            model: tf.keras.Model,
-            input_array: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Private inference function for TCN-AE.
-
-        :param model: trained model
-        :param input_array: multivariate time series of shape (number_of_timesteps, channels)
-        :return: detection score
-        :return: list of model outputs (mean, std, sample)
-        """
-
-        assert input_array.ndim == 2, 'input_array must be a 2D numpy array (time_steps, channels)!'
-        assert self.window_size is not None, 'window_size must be provided!'
-        assert self.window_shift is not None, 'window_shift must be provided!'
-
-        # Window input array
-        input_windows = self.window_array(input_array, self.window_size, self.window_shift)
-        # Predict output windows
-        xhat, _ = model.predict(input_windows, batch_size=self.batch_size, verbose=0)
-        # Reverse window reconstruction
-        xhat = self._reverse_window_array(xhat)
-        # Calculate negative log likelihood
-        anomaly_score = model.rec_fn(input_array, xhat, reduce_time=False).numpy()
-        # Clear GPU memory before next call
-        tf.keras.backend.clear_session()
-        # Return anomaly score and model outputs
-        return anomaly_score, xhat
+        return anomaly_score, rootcause_score, [xhat_mean, xhat_std, xhat]
 
     def _sisvae_inference(
             self,
             model: tf.keras.Model,
             input_array: np.ndarray,
-    ) -> Tuple[np.ndarray, List[np.ndarray]]:
+    ) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
         """
         Private inference function for SISVAE.
 
@@ -363,18 +345,20 @@ class Inferencer(base_class.BaseProcessor):
         xhat = self._reverse_window_array(xhat)
         # Calculate standard deviation parameter
         xhat_std = np.sqrt(xhat_var)
-        # Calculate negative log likelihood
+        # Calculate anomaly score
         anomaly_score = model.rec_fn(input_array, [xhat_mean, np.log(xhat_var)], reduce_time=False).numpy()
+        # Calculate rootcause scores
+        rootcause_score = -tfp.distributions.Normal(loc=xhat_mean, scale=xhat_std).log_prob(input_array)
         # Clear GPU memory before next call
         tf.keras.backend.clear_session()
         # Return anomaly score and model outputs
-        return anomaly_score, [xhat_mean, xhat_std, xhat]
+        return anomaly_score, rootcause_score, [xhat_mean, xhat_std, xhat]
 
     def _omnianomaly_inference(
             self,
             model: tf.keras.Model,
             input_array: np.ndarray,
-    ) -> Tuple[np.ndarray, List[np.ndarray]]:
+    ) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
         """
         Private inference function for OmniAnomaly.
 
@@ -402,18 +386,20 @@ class Inferencer(base_class.BaseProcessor):
         xhat = self._reverse_window_array(xhat)
         # Calculate standard deviation parameter
         xhat_std = np.sqrt(xhat_var)
-        # Calculate negative log likelihood
+        # Calculate anomaly score
         anomaly_score = model.rec_fn(input_array, [xhat_mean, np.log(xhat_var)], reduce_time=False).numpy()
+        # Calculate rootcause scores
+        rootcause_score = -tfp.distributions.Normal(loc=xhat_mean, scale=xhat_std).log_prob(input_array)
         # Clear GPU memory before next call
         tf.keras.backend.clear_session()
         # Return anomaly score and model outputs
-        return anomaly_score, [xhat_mean, xhat_std, xhat]
+        return anomaly_score, rootcause_score, [xhat_mean, xhat_std, xhat]
 
     def _lwvae_inference(
             self,
             model: tf.keras.Model,
             input_array: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, None, np.ndarray]:
         """
         Private inference function for LW-VAE.
 
@@ -433,18 +419,18 @@ class Inferencer(base_class.BaseProcessor):
         xhat, _, _, _, = model.predict(input_windows, batch_size=self.batch_size, verbose=0)
         # Reverse window reconstruction
         xhat = self._reverse_window_array(xhat)
-        # Calculate negative log likelihood
+        # Calculate anomaly score
         anomaly_score = model.rec_fn(input_array, xhat, reduce_time=False).numpy()
         # Clear GPU memory before next call
         tf.keras.backend.clear_session()
         # Return anomaly score and model outputs
-        return anomaly_score, xhat
+        return anomaly_score, None, xhat
 
     def _vsvae_inference(
             self,
             model: tf.keras.Model,
             input_array: np.ndarray,
-    ) -> Tuple[np.ndarray, List[np.ndarray]]:
+    ) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
         """
         Private inference function for VS-VAE.
 
@@ -471,18 +457,20 @@ class Inferencer(base_class.BaseProcessor):
         xhat = self._reverse_window_array(xhat)
         # Calculate standard deviation parameter
         xhat_std = np.sqrt(xhat_var)
-        # Calculate negative log likelihood
+        # Calculate anomaly score
         anomaly_score = model.rec_fn(input_array, [xhat_mean, np.log(xhat_var)], reduce_time=False).numpy()
+        # Calculate rootcause scores
+        rootcause_score = -tfp.distributions.Laplace(loc=xhat_mean, scale=xhat_std).log_prob(input_array)
         # Clear GPU memory before next call
         tf.keras.backend.clear_session()
         # Return anomaly score and model outputs
-        return anomaly_score, [xhat_mean, xhat_std, xhat]
+        return anomaly_score, rootcause_score, [xhat_mean, xhat_std, xhat]
 
     def _vasp_inference(
             self,
             model: tf.keras.Model,
             input_array: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, None, np.ndarray]:
         """
         Private inference function for VASP.
 
@@ -502,9 +490,91 @@ class Inferencer(base_class.BaseProcessor):
         xhat, _, _, _, = model.predict(input_windows, batch_size=self.batch_size, verbose=0)
         # Reverse window reconstruction
         xhat = self._reverse_window_array(xhat)
-        # Calculate negative log likelihood
+        # Calculate anomaly score
         anomaly_score = model.rec_fn(input_array, xhat, reduce_time=False).numpy()
         # Clear GPU memory before next call
         tf.keras.backend.clear_session()
         # Return anomaly score and model outputs
-        return anomaly_score, xhat
+        return anomaly_score, None, xhat
+
+    def _wvae_inference(
+            self,
+            model: tf.keras.Model,
+            input_array: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
+        """
+        Private inference function for WVAE.
+
+        :param model: trained model
+        :param input_array: multivariate time series of shape (number_of_timesteps, channels)
+        :return: detection score
+        :return: list of model outputs (mean, std, sample)
+        """
+
+        assert input_array.ndim == 2, 'input_array must be a 2D numpy array (time_steps, channels)!'
+        assert self.window_size is not None, 'window_size must be provided!'
+        assert self.window_shift is not None, 'window_shift must be provided!'
+
+        # Window input array
+        input_windows = self.window_array(input_array, self.window_size, self.window_shift)
+        # Predict output windows
+        xhat_mean, xhat_logvar, xhat, _, _, _ = model.predict(input_windows, batch_size=self.batch_size, verbose=0)
+        # Calculate variance parameter
+        xhat_var = np.exp(xhat_logvar)
+        # Reverse window mean parameter
+        xhat_mean = self._reverse_window_array(xhat_mean)
+        # Reverse window variance parameter
+        xhat_var = self._reverse_window_array(xhat_var)
+        # Reverse window reconstruction
+        xhat = self._reverse_window_array(xhat)
+        # Calculate standard deviation parameter
+        xhat_std = np.sqrt(xhat_var)
+        # Calculate anomaly score
+        anomaly_score = model.rec_fn(input_array, [xhat_mean, np.log(xhat_var)], reduce_time=False).numpy()
+        # Calculate rootcause scores
+        rootcause_score = -tfp.distributions.Normal(loc=xhat_mean, scale=xhat_std).log_prob(input_array)
+        # Clear GPU memory before next call
+        tf.keras.backend.clear_session()
+        # Return anomaly score and model outputs
+        return anomaly_score, rootcause_score, [xhat_mean, xhat_std, xhat]
+
+    def _noma_inference(
+            self,
+            model: tf.keras.Model,
+            input_array: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
+        """
+        Private inference function for NOMA.
+
+        :param model: trained model
+        :param input_array: multivariate time series of shape (number_of_timesteps, channels)
+        :return: detection score
+        :return: list of model outputs (mean, std, sample)
+        """
+
+        assert input_array.ndim == 2, 'input_array must be a 2D numpy array (time_steps, channels)!'
+        assert self.window_size is not None, 'window_size must be provided!'
+        assert self.window_shift is not None, 'window_shift must be provided!'
+
+        # Window input array
+        input_windows = self.window_array(input_array, self.window_size, self.window_shift)
+        # Predict output windows
+        xhat_mean, xhat_logvar, xhat, _, _, _ = model.predict(input_windows, batch_size=self.batch_size, verbose=0)
+        # Calculate variance parameter
+        xhat_var = np.exp(xhat_logvar)
+        # Reverse window mean parameter
+        xhat_mean = self._reverse_window_array(xhat_mean)
+        # Reverse window variance parameter
+        xhat_var = self._reverse_window_array(xhat_var)
+        # Reverse window reconstruction
+        xhat = self._reverse_window_array(xhat)
+        # Calculate standard deviation parameter
+        xhat_std = np.sqrt(xhat_var)
+        # Calculate anomaly score
+        anomaly_score = model.rec_fn(input_array, [xhat_mean, np.log(xhat_var)], reduce_time=False).numpy()
+        # Calculate rootcause scores
+        rootcause_score = -tfp.distributions.Normal(loc=xhat_mean, scale=xhat_std).log_prob(input_array)
+        # Clear GPU memory before next call
+        tf.keras.backend.clear_session()
+        # Return anomaly score and model outputs
+        return anomaly_score, rootcause_score, [xhat_mean, xhat_std, xhat]

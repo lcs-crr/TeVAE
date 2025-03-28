@@ -12,6 +12,7 @@ import tensorflow as tf
 import numpy as np
 from sklearn.model_selection import train_test_split
 from utilities import data_class
+from dotenv import dotenv_values
 
 # Declare constants
 SEED = 1
@@ -28,8 +29,12 @@ data_path = config['data_path']
 model_path = config['model_path']
 
 data_processor = data_class.DataProcessor(
-    scale_method='z-score'
+    scale_method='z-score',
+    sampling_rate=2,
 )
+
+data_load_path = os.path.join(data_path, '1_parsed')
+data_save_path = os.path.join(data_path, '2_preprocessed')
 
 # Load raw data
 normal_list = data_processor.load_pickle(os.path.join(data_load_path, 'normal.pkl'))
@@ -40,20 +45,20 @@ split_names = ['1h', '8h', '64h', '512h']
 
 for split_idx, split in enumerate(split_idcs):
     train_list = normal_list[:split]
-    test_list_normal = normal_list[split[-1]:]
+    test_list_normal = normal_list[split_idcs[-1]:]
     test_list = test_list_normal + anomalous_list
     random.shuffle(test_list)
 
     # Split training data into training and validation
-    train_list_resampled, val_list_resampled = train_test_split(train_list, random_state=SEED, test_size=0.2)
+    train_list, val_list = train_test_split(train_list, random_state=SEED, test_size=0.2)
 
     # Find the scalers for each feature
-    data_processor.find_scalers_from_list(train_list_resampled)
+    data_processor.find_scalers_from_list(train_list)
 
     # Scale data
-    train_list_scaled = data_processor.scale_list(train_list_resampled)
-    val_list_scaled = data_processor.scale_list(val_list_resampled)
-    test_list_scaled = data_processor.scale_list(test_list_resampled)
+    train_list_scaled = data_processor.scale_list(train_list)
+    val_list_scaled = data_processor.scale_list(val_list)
+    test_list_scaled = data_processor.scale_list(test_list)
 
     # Find the window size
     data_processor.find_window_size_from_list(train_list_scaled)

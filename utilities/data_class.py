@@ -16,8 +16,7 @@ class DataProcessor(base_class.BaseProcessor):
     def __init__(
             self,
             window_size: int = None,
-            original_sampling_rate: int = None,
-            target_sampling_rate: int = None,
+            sampling_rate: int = None,
             scale_method: str = None,
             window_shift: Union[int, str] = 'half',
     ) -> None:
@@ -25,15 +24,13 @@ class DataProcessor(base_class.BaseProcessor):
         This class comprises all required functions to process the data.
 
         :param window_size: window size
-        :param original_sampling_rate: original sampling rate of raw data
-        :param target_sampling_rate: target sampling rate of processed data
+        :param sampling_rate: sampling rate of data
         :param scale_method: scaling method, either 'z-score' or 'min-max'
         :param window_shift: window overlap, integer refers to number of time steps, half to half a window
         """
         super().__init__()
         self.window_size = window_size
-        self.original_sampling_rate = original_sampling_rate
-        self.target_sampling_rate = target_sampling_rate
+        self.sampling_rate = sampling_rate
         self.scale_method = scale_method
         self.window_shift = window_shift
         self.minimum = None
@@ -157,14 +154,9 @@ class DataProcessor(base_class.BaseProcessor):
         :return:
         """
 
-        if self.downsampled_flag:
-            sampling_rate = self.target_sampling_rate
-        else:
-            sampling_rate = self.original_sampling_rate
-
         time_duration = []
         for _, input_array in enumerate(input_list):
-            time_duration.append(len(input_array) / (sampling_rate * 60 * 60))  # 2*60*60 to convert to hours
+            time_duration.append(len(input_array) / (self.sampling_rate * 60 * 60))  # 2*60*60 to convert to hours
         cum_time_duration = np.cumsum(time_duration)
 
         splits_idcs = []

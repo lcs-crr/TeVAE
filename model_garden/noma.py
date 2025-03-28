@@ -11,7 +11,6 @@ tfkl = tf.keras.layers
 tfd = tfp.distributions
 
 
-@tf.keras.saving.register_keras_serializable(package="NOMA")
 class KLAnnealing(tf.keras.callbacks.Callback):
     def __init__(
             self,
@@ -63,7 +62,6 @@ class KLAnnealing(tf.keras.callbacks.Callback):
         return cls(**config)
 
 
-@tf.keras.saving.register_keras_serializable(package="NOMA")
 class NOMA(tf.keras.Model):
     def __init__(
             self,
@@ -180,7 +178,6 @@ class NOMA(tf.keras.Model):
         return cls(encoder=encoder, decoder=decoder, beta=config["beta"])
 
 
-@tf.keras.saving.register_keras_serializable(package="NOMA")
 class NOMA_Encoder(tf.keras.Model):
     def __init__(
             self,
@@ -238,7 +235,6 @@ class NOMA_Encoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="NOMA")
 class NOMA_Decoder(tf.keras.Model):
     def __init__(
             self,

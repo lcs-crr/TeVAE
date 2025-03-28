@@ -13,7 +13,6 @@ tfkl = tf.keras.layers
 tfd = tfp.distributions
 
 
-@tf.keras.saving.register_keras_serializable(package="SISVAE")
 class SISVAE(tf.keras.Model):
     def __init__(
             self,
@@ -146,7 +145,6 @@ class SISVAE(tf.keras.Model):
         return cls(encoder=encoder, decoder=decoder)
 
 
-@tf.keras.saving.register_keras_serializable(package="SISVAE")
 class SISVAE_Encoder(tf.keras.Model):
     def __init__(
             self,
@@ -202,7 +200,6 @@ class SISVAE_Encoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="SISVAE")
 class SISVAE_Decoder(tf.keras.Model):
     def __init__(
             self,

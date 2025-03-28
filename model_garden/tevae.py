@@ -11,7 +11,6 @@ tfkl = tf.keras.layers
 tfd = tfp.distributions
 
 
-@tf.keras.saving.register_keras_serializable(package="TEVAE")
 class KLAnnealing(tf.keras.callbacks.Callback):
     def __init__(
             self,
@@ -63,7 +62,6 @@ class KLAnnealing(tf.keras.callbacks.Callback):
         return cls(**config)
 
 
-@tf.keras.saving.register_keras_serializable(package="TEVAE")
 class TEVAE(tf.keras.Model):
     def __init__(
             self,
@@ -189,7 +187,6 @@ class TEVAE(tf.keras.Model):
         return cls(encoder=encoder, decoder=decoder, ma=ma, beta=config["beta"])
 
 
-@tf.keras.saving.register_keras_serializable(package="TEVAE")
 class TEVAE_Encoder(tf.keras.Model):
     def __init__(
             self,
@@ -247,7 +244,6 @@ class TEVAE_Encoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="TEVAE")
 class TEVAE_Decoder(tf.keras.Model):
     def __init__(
             self,
@@ -304,7 +300,6 @@ class TEVAE_Decoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="TEVAE")
 class MA(tf.keras.Model):
     def __init__(
             self,

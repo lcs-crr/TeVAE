@@ -13,7 +13,6 @@ tfkl = tf.keras.layers
 tfd = tfp.distributions
 
 
-@tf.keras.saving.register_keras_serializable(package="WVAE")
 class KLAnnealing(tf.keras.callbacks.Callback):
     def __init__(
             self,
@@ -96,14 +95,14 @@ class WVAE(tf.keras.Model):
     def train_step(self, x, **kwargs):
         with tf.GradientTape() as tape:
             # Forward pass through encoder
-            z_mean, z_logvar, z, states = self.encoder(x, training=True)
+            z_mean, z_logvar, z = self.encoder(x, training=True)
             # Forward pass through decoder
             xhat_mean, xhat_logvar, xhat = self.decoder(z, training=True)
             # Calculate losses from parameters
             rec_loss = self.rec_fn(x, [xhat_mean, xhat_logvar])
             kl_loss = self.kldiv_fn([z_mean, z_logvar])
             # Calculate total loss from different losses
-            total_loss = rec_loss + self.beta * kl_loss
+            loss = rec_loss + self.beta * kl_loss
         # Calculate gradients in backward pass
         grads = tape.gradient(loss, self.trainable_weights)
         # Apply gradients
@@ -160,12 +159,11 @@ class WVAE(tf.keras.Model):
 
     @classmethod
     def from_config(cls, config, **kwargs):
-        encoder = TEVAE_Encoder.from_config(config["encoder"])
-        decoder = TEVAE_Decoder.from_config(config["decoder"])
+        encoder = WVAE_Encoder.from_config(config["encoder"])
+        decoder = WVAE_Decoder.from_config(config["decoder"])
         return cls(encoder=encoder, decoder=decoder, beta=config["beta"])
 
 
-@tf.keras.saving.register_keras_serializable(package="WVAE")
 class WVAE_Encoder(tf.keras.Model):
     def __init__(
             self,
@@ -223,7 +221,6 @@ class WVAE_Encoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="WVAE")
 class WVAE_Decoder(tf.keras.Model):
     def __init__(
             self,

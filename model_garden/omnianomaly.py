@@ -13,7 +13,6 @@ tfkl = tf.keras.layers
 tfd = tfp.distributions
 
 
-@tf.keras.saving.register_keras_serializable(package="OmniAnomaly")
 class OmniAnomaly(tf.keras.Model):
     def __init__(
             self,
@@ -145,7 +144,6 @@ class OmniAnomaly(tf.keras.Model):
         return cls(encoder=encoder, decoder=decoder)
 
 
-@tf.keras.saving.register_keras_serializable(package="OmniAnomaly")
 class OmniAnomaly_Encoder(tf.keras.Model):
     def __init__(
             self,
@@ -204,7 +202,6 @@ class OmniAnomaly_Encoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="OmniAnomaly")
 class OmniAnomaly_Decoder(tf.keras.Model):
     def __init__(
             self,

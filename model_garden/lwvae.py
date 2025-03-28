@@ -13,7 +13,6 @@ tfkl = tf.keras.layers
 tfd = tfp.distributions
 
 
-@tf.keras.saving.register_keras_serializable(package="LWVAE")
 class LWVAE(tf.keras.Model):
     def __init__(
             self,
@@ -116,7 +115,6 @@ class LWVAE(tf.keras.Model):
         return cls(encoder=encoder, decoder=decoder)
 
 
-@tf.keras.saving.register_keras_serializable(package="LWVAE")
 class LWVAE_Encoder(tf.keras.Model):
     def __init__(
             self,
@@ -172,7 +170,6 @@ class LWVAE_Encoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="LWVAE")
 class LWVAE_Decoder(tf.keras.Model):
     def __init__(
             self,

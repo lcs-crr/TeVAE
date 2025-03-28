@@ -13,7 +13,6 @@ tfkl = tf.keras.layers
 tfd = tfp.distributions
 
 
-@tf.keras.saving.register_keras_serializable(package="VASP")
 class VASP(tf.keras.Model):
     def __init__(
             self,
@@ -116,7 +115,6 @@ class VASP(tf.keras.Model):
         return cls(encoder=encoder, decoder=decoder)
 
 
-@tf.keras.saving.register_keras_serializable(package="VASP")
 class VASP_Encoder(tf.keras.Model):
     def __init__(
             self,
@@ -174,7 +172,6 @@ class VASP_Encoder(tf.keras.Model):
         )
 
 
-@tf.keras.saving.register_keras_serializable(package="VASP")
 class VASP_Decoder(tf.keras.Model):
     def __init__(
             self,
