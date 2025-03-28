@@ -14,7 +14,7 @@ from utilities import inference_class
 
 # Declare constants
 SEED = 1
-MODEL_NAME = 'wvae'  # or 'omnianomaly', 'sisvae', 'lwvae', 'vsvae', 'vasp', 'wvae', 'noma'
+MODEL_NAME = 'tevae'  # or 'omnianomaly', 'sisvae', 'lwvae', 'vsvae', 'vasp', 'wvae', 'noma'
 
 # Set fixed seed for random operations
 tf.keras.utils.set_random_seed(SEED)

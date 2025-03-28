@@ -11,94 +11,85 @@ import random
 import tensorflow as tf
 import sklearn.metrics
 from scipy import integrate
+from utilities import detection_class
+from dotenv import dotenv_values
 
-import utils.utility_functions as utility_functions
+# Declare constants
+MODEL_NAME = 'tevae'  # or 'omnianomaly', 'sisvae', 'lwvae', 'vsvae', 'vasp', 'wvae', 'noma'
+reverse_window_mode = 'mean'  # 'last', 'first'
 
-seed_list = [1, 2, 3]
+# Load variables in .env file
+config = dotenv_values("../.env")
+
+# Load directory paths from .env file
+data_path = config['data_path']
+model_path = config['model_path']
+
 data_split_list = ['1h', '8h', '64h', '512h']
-reverse_window_mode = 'mean'
-# reverse_window_mode = 'last'
-# reverse_window_mode = 'first'
-sampling_rate = 2
-model_name = 'tevae'
-window_size = 256
 
-data_load_path = 'Path to data'
-model_load_path = 'Path to model'
+channel_list = [
+    'Vehicle Speed [-]',
+    'EDU Torque [-]',
+    'Left Axle Torque [-]',
+    'Right Axle Torque [-]',
+    'EDU Current [-]',
+    'EDU Voltage [-]',
+    'HVB Current [-]',
+    'HVB Voltage [-]',
+    'HVB Temperature [-]',
+    'HVB State of Charge [-]',
+    'EDU Rotor Temperature [-]',
+    'EDU Stator Temperature [-]',
+    'Inverter Temperature [-]',
+]
 
-for model_seed in seed_list:
+motor_pump_middle_groundtruth_rootcause_channels = [10, 11, 12]
+motor_pump_beginning_groundtruth_rootcause_channels = [10, 11, 12]
+wheel_diameter_groundtruth_rootcause_channels = [0]
+recup_off_groundtruth_rootcause_channels = [1, 2, 3, 9]
+batt_sim_groundtruth_rootcause_channels = [6, 7, 8, 9]
+
+for model_seed in range(1, 4):
     for data_split in data_split_list:
-        seed = model_seed
-        np.random.seed(seed)
-        tf.random.set_seed(seed)
-        random.seed(seed)
+        # Declare model name and paths
+        model_name = MODEL_NAME + '_' + data_split + '_' + str(model_seed)
+        data_load_path = os.path.join(data_path, '2_preprocessed')
+        model_load_path = os.path.join(model_path, model_name)
 
-        channel_list = ['Vehicle Speed [-]',
-                        'EDU Torque [-]',
-                        'Left Axle Torque [-]',
-                        'Right Axle Torque [-]',
-                        'EDU Current [-]',
-                        'EDU Voltage [-]',
-                        'HVB Current [-]',
-                        'HVB Voltage [-]',
-                        'HVB Temperature [-]',
-                        'HVB State of Charge [-]',
-                        'EDU Rotor Temperature [-]',
-                        'EDU Stator Temperature [-]',
-                        'Inverter Temperature [-]',
-                        ]
+        # Load tf.data to get window_size
+        tfdata_train = tf.data.Dataset.load(os.path.join(data_load_path, data_split, 'train'))
 
-        val_list = utility_functions.load_pickle(os.path.join(data_load_path, data_split, 'val.pkl'))
-        test_list = utility_functions.load_pickle(os.path.join(data_load_path, data_split, 'test.pkl'))
+        detector = detection_class.AnomalyDetector(
+            model_path=model_load_path,
+            window_size=tfdata_train.element_spec.shape[0],
+            sampling_rate=2,
+            original_sampling_rate=10,
+            calculate_delay=True,
+            label_keyword='normal',
+        )
 
-        model_config = model_name + '_' + data_split + '_' + str(model_seed)
+        # Load data
+        val_list = detector.load_pickle(os.path.join(data_load_path, data_split, 'val.pkl'))
+        test_list = detector.load_pickle(os.path.join(data_load_path, data_split, 'test.pkl'))
 
-        # Inference on validation data
-        model = tf.keras.models.load_model(os.path.join(model_load_path, model_config))
-        val_anomaly_score = []
-        val_rootcause_score = []
-        val_recon = []
-        val_latent = []
-        for val_ts in val_list:
-            if model_name == 'vasp':
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vasp(model, val_ts, reverse_window_mode, window_size)
-            elif model_name == 'lwvae':
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_lwvae(model, val_ts, reverse_window_mode, window_size)
-            else:
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vae(model, val_ts, reverse_window_mode, window_size)
-            val_anomaly_score.append(anomaly_score)
-            val_rootcause_score.append(rootcause_score)
-            val_recon.append(recon)
-            val_latent.append(latent)
+        # Load inference results for validation data
+        val_detection_score_list = detector.load_pickle(os.path.join(model_load_path, 'val_detection_score.pkl'))
+        val_output = detector.load_pickle(os.path.join(model_load_path, 'val_output.pkl'))
 
-        # Inference on test data
-        test_anomaly_score = []
-        test_rootcause_score = []
-        test_recon = []
-        test_latent = []
-        for test_ts in test_list:
-            if model_name == 'vasp':
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vasp(model, test_ts, reverse_window_mode, window_size)
-            elif model_name == 'lwvae':
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_lwvae(model, test_ts, reverse_window_mode, window_size)
-            else:
-                anomaly_score, rootcause_score, recon, latent = utility_functions.inference_vae(model, test_ts, reverse_window_mode, window_size)
-            test_anomaly_score.append(anomaly_score)
-            test_rootcause_score.append(rootcause_score)
-            test_recon.append(recon)
-            test_latent.append(latent)
+        # Load inference results for test data
+        test_detection_score_list = detector.load_pickle(os.path.join(model_load_path, 'test_detection_score.pkl'))
+        test_output = detector.load_pickle(os.path.join(model_load_path, 'test_output.pkl'))
 
-        # Evaluate validation data to obtain threshold
-        max_val_list_error = [np.max(score_ts) for score_ts in val_anomaly_score]
-        threshold = np.percentile(max_val_list_error, 100)
+        # Evaluate the model
+        threshold = detector.unsupervised_threshold(val_detection_score_list)
 
-        motor_pump_middle_groundtruth_rootcause_channels = [10, 11, 12]
-        motor_pump_beginning_groundtruth_rootcause_channels = [10, 11, 12]
-        wheel_diameter_groundtruth_rootcause_channels = [0]
-        recup_off_groundtruth_rootcause_channels = [1, 2, 3, 9]
-        batt_sim_groundtruth_rootcause_channels = [6, 7, 8, 9]
+        groundtruth_labels, predicted_labels, total_delays = detector.evaluate_online(
+            input_list=test_list,
+            detection_score_list=test_detection_score_list,
+            threshold=threshold,
+        )
 
-        # Evaluate test data using unsupervised threshold
+        # Evaluate test data using unsupervised threshold  # TODO
         FP = 0
         TN = 0
         FN = 0
@@ -276,7 +267,7 @@ for model_seed in seed_list:
         print()
 
         threshold = threshold_best
-        
+
         # Reevaluate test data using ideal threshold
         FP = 0
         TN = 0
@@ -336,7 +327,7 @@ for model_seed in seed_list:
                     total_delays.append(delay)
             # Append to list with all test anomaly scores
             total_test_anomaly_score.append(score_ts)
-            
+
         TP_rc = 0
         FP_rc = 0
         for idx_test, _ in enumerate(test_rootcause_channels):
