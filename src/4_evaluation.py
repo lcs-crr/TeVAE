@@ -49,6 +49,8 @@ wheel_diameter_groundtruth_rootcause_channels = [0]
 recup_off_groundtruth_rootcause_channels = [1, 2, 3, 9]
 batt_sim_groundtruth_rootcause_channels = [6, 7, 8, 9]
 
+results = []
+results_best = []
 for model_seed in range(1, 4):
     for data_split in data_split_list:
         # Declare model name and paths
@@ -83,72 +85,12 @@ for model_seed in range(1, 4):
         # Evaluate the model
         threshold = detector.unsupervised_threshold(val_detection_score_list)
 
-        groundtruth_labels, predicted_labels, total_delays = detector.evaluate_online(
+        groundtruth_labels, predicted_labels, total_delays, predicted_rootcause = detector.evaluate_online(
             input_list=test_list,
             detection_score_list=test_detection_score_list,
             threshold=threshold,
         )
 
-        # Evaluate test data using unsupervised threshold  # TODO
-        FP = 0
-        TN = 0
-        FN = 0
-        TP = 0
-        total_delays = []
-        total_test_anomaly_score = []
-        test_rootcause_channels = []
-        test_rootcause_labels = []
-        for idx_test, score_ts in enumerate(test_anomaly_score):
-            label = test_list[idx_test].dtype.metadata['label']
-            # Ground-truth normal time series
-            if label == 'normal':
-                # >0 time steps in anomaly score higher than threshold
-                # False positive
-                if np.sum(score_ts >= threshold) > 0:
-                    FP += 1
-                    test_rootcause_channels.append(np.nan)
-                    test_rootcause_labels.append(label)
-                # =0 time steps in anomaly score higher than threshold
-                # True negative
-                else:
-                    TN += 1
-
-            # Ground-truth anomalous time series
-            else:
-                # Extract groundtruth anomaly start from file name
-                if label == 'motor_pump_middle':
-                    groundtruth_anomaly_start = 0.5 * len(score_ts)
-                else:
-                    groundtruth_anomaly_start = 0
-                # >0 time steps in anomaly score higher than threshold
-                # Anomaly predicted
-                if np.sum(score_ts >= threshold) > 0:
-                    predicted_anomaly_start = np.argwhere(score_ts >= threshold)[0][0]
-                    # First predicted anomalous time step is after the groundtruth anomaly start
-                    # True positive
-                    if predicted_anomaly_start > groundtruth_anomaly_start:
-                        TP += 1
-                        delay, _ = ts_processor.find_detection_delay(score_ts, threshold, sampling_rate, reverse_window_mode, window_size, len(score_ts), groundtruth_anomaly_start)
-                        total_delays.append(delay)
-                        test_rootcause_channels.append(np.argmax([test_rootcause_score[idx_test][np.argmax(score_ts[:, 0] > threshold), j] for j in range(len(channel_list))]))
-                        test_rootcause_labels.append(label)
-                    # First predicted anomalous time step is before the groundtruth anomaly start
-                    # False positive
-                    else:
-                        FP += 1
-                        delay, _ = ts_processor.find_detection_delay(score_ts, threshold, sampling_rate, reverse_window_mode, window_size, len(score_ts), groundtruth_anomaly_start)
-                        total_delays.append(abs(delay))
-                        test_rootcause_channels.append(np.nan)
-                        test_rootcause_labels.append(label)
-                # =0 time steps in anomaly score higher than threshold
-                # False negative
-                else:
-                    FN += 1
-                    delay = (len(score_ts) - groundtruth_anomaly_start) / sampling_rate
-                    total_delays.append(delay)
-            # Append to list with all test anomaly scores
-            total_test_anomaly_score.append(score_ts)
-
         TP_rc = 0
         FP_rc = 0
         for idx_test, _ in enumerate(test_rootcause_channels):
@@ -178,155 +120,37 @@ for model_seed in range(1, 4):
                 else:
                     FP_rc += 1
 
-        precision_list = []
-        recall_list = []
+        results.append({
+            'Seed': model_seed,
+            'Fold': fold_idx,
+            'F1': metrics.f1_score(groundtruth_labels, predicted_labels, zero_division=0.0),
+            'Precision': metrics.precision_score(groundtruth_labels, predicted_labels, zero_division=0.0),
+            'Recall': metrics.recall_score(groundtruth_labels, predicted_labels, zero_division=0.0),
+            'Delay': np.mean(total_delays),
+            'Rootcause Precision': TP_rc / (TP_rc + FP_rc) if TP_rc + FP_rc > 0 else 0.0,
+            'Threshold': threshold
+        })
+
         f1_list = []
-        flattened_test_anomaly_score = np.concatenate(total_test_anomaly_score).ravel()
-        percentile_array = np.arange(0, 100.1, 0.1)
+        reduced_test_detection_score = np.concatenate(test_detection_score_list).ravel()
+        percentile_array = np.arange(0, 100.01, 0.01)
         for threshold_percentile in percentile_array:
-            threshold_temp = np.percentile(flattened_test_anomaly_score, threshold_percentile)
-            groundtruth_labels = []
-            predicted_labels = []
-            for idx_test, score_ts in enumerate(test_anomaly_score):
-                label = test_list[idx_test].dtype.metadata['label']
-                # Ground-truth normal time series
-                if label == 'normal':
-                    # >0 time steps in anomaly score higher than threshold
-                    # False positive
-                    if np.sum(score_ts >= threshold_temp) > 0:
-                        predicted_labels.append(True)
-                        groundtruth_labels.append(False)
-                    # =0 time steps in anomaly score higher than threshold
-                    # True negative
-                    else:
-                        predicted_labels.append(False)
-                        groundtruth_labels.append(False)
-                # Ground-truth anomalous time series
-                else:
-                    # Extract groundtruth anomaly start from file name
-                    if label == 'motor_pump_middle':
-                        groundtruth_anomaly_start = 0.5 * len(score_ts)
-                    else:
-                        groundtruth_anomaly_start = 0
-                    # >0 time steps in anomaly score higher than threshold
-                    # Anomaly predicted
-                    if np.sum(score_ts >= threshold_temp) > 0:
-                        predicted_anomaly_start = np.argwhere(score_ts >= threshold_temp)[0][0]
-                        # First predicted anomalous time step is after the groundtruth anomaly start
-                        # True positive
-                        if predicted_anomaly_start > groundtruth_anomaly_start:
-                            predicted_labels.append(True)
-                            groundtruth_labels.append(True)
-                        # First predicted anomalous time step is before the groundtruth anomaly start
-                        # False positive
-                        else:
-                            predicted_labels.append(True)
-                            groundtruth_labels.append(False)
-                    # =0 time steps in anomaly score higher than threshold
-                    # False negative
-                    else:
-                        predicted_labels.append(False)
-                        groundtruth_labels.append(True)
-            precision = metrics.precision_score(groundtruth_labels, predicted_labels)
-            recall = metrics.recall_score(groundtruth_labels, predicted_labels)
-            f1 = metrics.f1_score(groundtruth_labels, predicted_labels)
-            precision_list.append(precision)
-            recall_list.append(recall)
-            f1_list.append(f1)
-        precision_list = np.vstack(precision_list)
-        recall_list = np.vstack(recall_list)
+            threshold_temp = np.percentile(reduced_test_detection_score, threshold_percentile)
+            groundtruth_labels_temp, predicted_labels_temp, _, _ = detector.evaluate_online(
+                input_list=test_list,
+                detection_score_list=test_detection_score_list,
+                threshold=threshold_temp,
+            )
+            f1_list.append(metrics.f1_score(groundtruth_labels_temp, predicted_labels_temp, zero_division=0.0))
         f1_list = np.vstack(f1_list)
         a_pr = metrics.auc(recall_list[:, 0], precision_list[:, 0])
-        threshold_best = np.percentile(flattened_test_anomaly_score, percentile_array[np.argmax(f1_list)])
+        threshold_best = np.percentile(reduced_test_detection_score, percentile_array[np.argmax(f1_list)]).astype(float)
 
-        print()
-        print(model_name)
-        print(data_split)
-        print(model_seed)
-        print('Unsupervised performance:')
-        print('TP:')
-        print(TP)
-        print('FN:')
-        print(FN)
-        print('TN:')
-        print(TN)
-        print('FP:')
-        print(FP)
-        print('Precision:')
-        print(TP / (TP + FP))
-        print('Recall:')
-        print(TP / (TP + FN))
-        print('F1 score:')
-        print(TP / (TP + 0.5 * (FP + FN)))
-        print('Area under precision-recall curve:')
-        print(a_pr)
-        print('Average detection delay in seconds:')
-        print(np.mean(total_delays))
-        print('Rootcause precision:')
-        print(TP_rc / (FP_rc + TP_rc))
-        print()
-
-        threshold = threshold_best
-
-        # Reevaluate test data using ideal threshold
-        FP = 0
-        TN = 0
-        FN = 0
-        TP = 0
-        total_delays = []
-        total_test_anomaly_score = []
-        test_rootcause_channels = []
-        test_rootcause_labels = []
-        for idx_test, score_ts in enumerate(test_anomaly_score):
-            label = test_list[idx_test].dtype.metadata['label']
-            # Ground-truth normal time series
-            if label == 'normal':
-                # >0 time steps in anomaly score higher than threshold
-                # False positive
-                if np.sum(score_ts >= threshold) > 0:
-                    FP += 1
-                    test_rootcause_channels.append(np.nan)
-                    test_rootcause_labels.append(label)
-                # =0 time steps in anomaly score higher than threshold
-                # True negative
-                else:
-                    TN += 1
-
-            # Ground-truth anomalous time series
-            else:
-                # Extract groundtruth anomaly start from file name
-                if label == 'motor_pump_middle':
-                    groundtruth_anomaly_start = 0.5 * len(score_ts)
-                else:
-                    groundtruth_anomaly_start = 0
-                # >0 time steps in anomaly score higher than threshold
-                # Anomaly predicted
-                if np.sum(score_ts >= threshold) > 0:
-                    predicted_anomaly_start = np.argwhere(score_ts >= threshold)[0][0]
-                    # First predicted anomalous time step is after the groundtruth anomaly start
-                    # True positive
-                    if predicted_anomaly_start > groundtruth_anomaly_start:
-                        TP += 1
-                        delay, _ = ts_processor.find_detection_delay(score_ts, threshold, sampling_rate, reverse_window_mode, window_size, len(score_ts), groundtruth_anomaly_start)
-                        total_delays.append(delay)
-                        test_rootcause_channels.append(np.argmax([test_rootcause_score[idx_test][np.argmax(score_ts[:, 0] > threshold), j] for j in range(len(channel_list))]))
-                        test_rootcause_labels.append(label)
-                    # First predicted anomalous time step is before the groundtruth anomaly start
-                    # False positive
-                    else:
-                        FP += 1
-                        delay, _ = ts_processor.find_detection_delay(score_ts, threshold, sampling_rate, reverse_window_mode, window_size, len(score_ts), groundtruth_anomaly_start)
-                        total_delays.append(abs(delay))
-                        test_rootcause_channels.append(np.nan)
-                        test_rootcause_labels.append(label)
-                # =0 time steps in anomaly score higher than threshold
-                # False negative
-                else:
-                    FN += 1
-                    delay = (len(score_ts) - groundtruth_anomaly_start) / sampling_rate
-                    total_delays.append(delay)
-            # Append to list with all test anomaly scores
-            total_test_anomaly_score.append(score_ts)
+        groundtruth_labels_best, predicted_labels_best, total_delays_best, predicted_rootcause = detector.evaluate_online(
+            input_list=test_list,
+            detection_score_list=test_detection_score_list,
+            threshold=threshold_best,
+        )
 
         TP_rc = 0
         FP_rc = 0
@@ -357,29 +181,36 @@ for model_seed in range(1, 4):
                 else:
                     FP_rc += 1
 
-        print(model_name)
-        print(data_split)
-        print(model_seed)
-        print('Theoretical maximum performance:')
-        print('TP:')
-        print(TP)
-        print('FN:')
-        print(FN)
-        print('TN:')
-        print(TN)
-        print('FP:')
-        print(FP)
-        print('Precision:')
-        print(TP / (TP + FP))
-        print('Recall:')
-        print(TP / (TP + FN))
-        print('F1 score:')
-        print(TP / (TP + 0.5 * (FP + FN)))
-        print('Area under precision-recall curve:')
-        print(a_pr)
-        print('Average detection delay in seconds:')
-        print(np.mean(total_delays))
-        print('Rootcause precision:')
-        print(TP_rc / (FP_rc + TP_rc))
+        results_best.append({
+            'Seed': model_seed,
+            'Fold': fold_idx,
+            'F1': metrics.f1_score(groundtruth_labels_best, predicted_labels_best, zero_division=0.0),
+            'Precision': metrics.precision_score(groundtruth_labels_best, predicted_labels_best, zero_division=0.0),
+            'Recall': metrics.recall_score(groundtruth_labels_best, predicted_labels_best, zero_division=0.0),
+            'Delay': np.mean(total_delays_best),
+            'Rootcause Precision': TP_rc/(TP_rc+FP_rc) if TP_rc+FP_rc > 0 else 0.0,
+            'Threshold': threshold_best
+        })
 
-        tf.keras.backend.clear_session()
+results = pd.DataFrame(results)
+results_best = pd.DataFrame(results_best)
+
+if not os.path.isfile(os.path.join(model_path, 'results.xlsx')):
+    # Create and save a valid Excel file
+    wb = openpyxl.Workbook()
+    wb.save(os.path.join(model_path, 'results.xlsx'))
+
+# Use a try-finally block to ensure proper handling
+try:
+    with pd.ExcelWriter(os.path.join(model_path, 'results.xlsx'), mode='a', if_sheet_exists='overlay') as writer:
+        results.to_excel(writer, index=False, sheet_name=MODEL_NAME + '_' + AD_MODE)
+        results_best.to_excel(writer, index=False, sheet_name=MODEL_NAME + '_' + AD_MODE + '_best')
+finally:
+    # Cleanup: Remove default 'Sheet' if it exists
+    try:
+        workbook = openpyxl.load_workbook(os.path.join(model_path, 'results.xlsx'))
+        if 'Sheet' in workbook.sheetnames:
+            del workbook['Sheet']
+        workbook.save(os.path.join(model_path, 'results.xlsx'))
+    except Exception as e:
+        print(f"Error cleaning up sheets: {e}")

@@ -119,7 +119,7 @@ class AnomalyDetector(base_class.BaseProcessor):
             input_list: List[np.ndarray],
             detection_score_list: List[np.ndarray],
             threshold: float = None,
-    ) -> Tuple[List[int], List[int], List[float]]:
+    ) -> Tuple[List[int], List[int], List[float], List[int]]:
         """
         This function evaluates the anomaly detection performance of a given model.
 
@@ -142,6 +142,7 @@ class AnomalyDetector(base_class.BaseProcessor):
 
         total_delays = []
         predicted_labels = []
+        predicted_rootcause = []
         for idx_detection_score, detection_score in enumerate(detection_score_list):
             if len(detection_score.shape) == 2:
                 detection_score = detection_score.sum(axis=-1)
@@ -151,6 +152,7 @@ class AnomalyDetector(base_class.BaseProcessor):
                 # False positive
                 if np.sum(detection_score >= threshold) > 0:
                     predicted_labels.append(True)
+                    predicted_rootcause.append(np.NaN)
                 # =0 time steps in anomaly score higher than threshold
                 # True negative
                 else:
@@ -167,10 +169,12 @@ class AnomalyDetector(base_class.BaseProcessor):
                     # True positive
                     if predicted_anomaly_start >= groundtruth_start:
                         predicted_labels.append(True)
+                        predicted_rootcause.append(np.argmax([test_rootcause_score[idx_test][np.argmax(score_ts[:, 0] > threshold), j] for j in range(len(channel_list))]))
                     # First predicted anomalous time step is before the groundtruth anomaly start
                     # False positive
                     else:
                         predicted_labels.append(np.NaN)  # Append np.Nan to indicate change to groundtruth labels
+                        predicted_rootcause.append(np.NaN)
                     if self.calculate_delay:
                         if self.reverse_window_penalty:
                             delay, _ = self._find_detection_delay(detection_score, threshold, len(detection_score), groundtruth_start)
@@ -187,7 +191,7 @@ class AnomalyDetector(base_class.BaseProcessor):
 
         groundtruth_labels, predicted_labels = self._correct_labels(groundtruth_labels, predicted_labels)
 
-        return groundtruth_labels, predicted_labels, total_delays
+        return groundtruth_labels, predicted_labels, total_delays, predicted_rootcause
 
     def evaluate_offline(
             self,
