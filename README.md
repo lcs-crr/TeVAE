@@ -1,6 +1,6 @@
 # TeVAE
 
-:exclamation: Warning :exclamation: Tensorflow 2.10.* has been found to feature multiple vunerabilites, hence use this repository at your own risk. For a (for now) safe implementation of TeVAE, refer to the [PATH repository](https://github.com/lcs-crr/PATH). 
+:exclamation: Warning :exclamation: TensorFlow 2.10 has been found to feature multiple vunerabilites, hence use this repository at your own risk. For a (for now) safe implementation of TeVAE in TensorFlow 2.15, please refer to the [PATH repository](https://github.com/lcs-crr/PATH). 
 
 TeVAE: A Variational Autoencoder Approach for Discrete Online Anomaly Detection in Variable-state Multivariate Time-series Data
 
